@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: intelliqa-sample-api
+    runtime: node
+    buildCommand: npm ci
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 4000
