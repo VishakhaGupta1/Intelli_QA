@@ -12,14 +12,14 @@ const JWT_SECRET = process.env.JWT_SECRET;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const GENERAL_API_LIMITER = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 500,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'rate_limit_exceeded', message: 'Too many API requests from this IP' },
 });
 const TOKEN_LIMITER = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'rate_limit_exceeded', message: 'Too many token requests from this IP' },
