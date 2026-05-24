@@ -220,10 +220,22 @@ app.use((req, res, next) => {
   next();
 });
 
-const allowedOrigins = new Set((process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
+const defaultAllowedOrigins = [
+  'https://intelliqa-production.up.railway.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+];
+
+const configuredOrigins = (process.env.CORS_ORIGIN || process.env.CORS_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
-  .filter(Boolean));
+  .filter(Boolean);
+
+const allowedOrigins = new Set([...
+  defaultAllowedOrigins,
+  ...configuredOrigins,
+]);
 
 app.use(cors({
   origin(origin, callback) {
