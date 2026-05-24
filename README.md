@@ -190,84 +190,188 @@ Full end-to-end pipeline:
 
 ```bash
 docker compose up -d --build
-python ai-generator/main.py --spec ai-generator/specs/sample-api.yaml
-mvn -f test-engine/pom.xml test
+# IntelliQA
+
+[![CI](https://github.com/VishakhaGupta1/Intelli_QA/actions/workflows/qa-pipeline.yml/badge.svg)](https://github.com/VishakhaGupta1/Intelli_QA/actions/workflows/qa-pipeline.yml)
+[![Tests](https://img.shields.io/badge/tests-17%20passing-brightgreen)]()
+[![Live](https://img.shields.io/badge/live-railway-purple)](https://intelliqa-production.up.railway.app)
+
+An end-to-end QA automation platform that reads an API spec, generates tests using AI, runs them, and shows results in a live dashboard.
+
+## How it works
+
+Give the platform an OpenAPI spec and the Python generator turns it into Java test cases with Groq-backed test generation. The Java test engine runs those tests against the real API and writes results to MongoDB. The dashboard API reads MongoDB and serves pass/fail rates, coverage gaps, flakiness, and defect data to the React dashboard in real time.
+
+## Architecture
+
+```mermaid
+graph LR
+    A[OpenAPI Spec] --> B[AI Generator\nPython + Groq]
+    B --> C[Test Engine\nJava + Selenium]
+    C --> D[(MongoDB Atlas)]
+    D --> E[Dashboard API\nNode.js + Express]
+    E --> F[Dashboard UI\nReact + Vite]
+    G[Prometheus] --> E
+    G --> H[Grafana]
 ```
 
-Expected output: generated Java tests land in `test-engine/src/test/java/com/qaplatform/api/`, the Java suite reports `14/14`, and the Python suite reports `8/8`.
+## Live demo
 
-## API Endpoints
+| Service | URL |
+|---|---|
+| Dashboard UI | https://intelliqa-production.up.railway.app |
+| Dashboard API | https://intelliqa-dashboard-api-production.up.railway.app |
+| Sample API | https://intelliqa-sample-api-production.up.railway.app |
 
-| Method | Path | Auth | Description |
-| --- | --- | --- | --- |
-| `POST` | `/api/auth/token` | No | Exchanges `CLIENT_SECRET` for a JWT Bearer token. |
-| `GET` | `/health` | No | API health check. |
-| `GET` | `/ready` | No | Readiness check that verifies the MongoDB connection. |
-| `GET` | `/metrics` | No, IP restricted | Prometheus metrics endpoint. |
-| `GET` | `/api/health` | Yes | Authenticated API health endpoint. |
-| `GET` | `/api/results` | Yes | Returns test results, stats, paging, and optional status filtering. |
-| `GET` | `/api/results/trend` | Yes | Returns daily pass-rate trends. |
-| `GET` | `/api/defects` | Yes | Returns defect logs with optional severity filtering. |
-| `GET` | `/api/coverage` | Yes | Returns coverage summary with optional tag filtering. |
-| `GET` | `/api/flakiness` | Yes | Returns flaky tests filtered by threshold. |
-| `GET` | `/api/gap-report` | Yes | Returns the latest AI-generated gap report. |
-| `GET` | `/api/metrics` | Yes | Returns Mongo-backed operational metrics. |
+## Stack
 
-See [docs/api-reference.md](docs/api-reference.md) for full request and response details.
+| Layer | Tech |
+|---|---|
+| AI Generator | Python, Groq API (Mixtral-8x7b) |
+| Test Engine | Java 17, TestNG, RestAssured, Selenium 4 |
+| Dashboard API | Node.js, Express, JWT, MongoDB |
+| Dashboard UI | React, Vite, Recharts |
+| Database | MongoDB Atlas |
+| Monitoring | Prometheus, Grafana |
+| CI/CD | GitHub Actions |
+| Deployment | Railway |
+
+## Quick start
+
+**Prerequisites:** Docker 24+, Java 17+, Python 3.11+, Node 20+
+
+```bash
+# 1. Clone
+git clone https://github.com/VishakhaGupta1/Intelli_QA.git
+cd Intelli_QA
+
+# 2. Generate secrets
+bash scripts/generate-secrets.sh
+
+# 3. Start everything
+docker compose up -d --build
+
+# 4. Seed demo data
+node scripts/seed-mongo.js
+
+# 5. Open dashboard
+start http://localhost:5173
+```
+
+## Running tests
+
+```bash
+# Start the sample API first
+cd sample-api && node server.js &
+
+# Run the full test suite
+mvn -f test-engine/pom.xml test
+# Expected: Tests run: 17, Failures: 0
+
+# Run Python unit tests
+python -m unittest discover -s ai-generator/tests -p "test_*.py"
+# Expected: Ran 8 tests - OK
+```
+
+## AI test generation
+
+```bash
+# Generate tests from the sample API spec (mock mode, no API key needed)
+cd ai-generator
+set USE_MOCK=true
+python main.py --spec specs/sample-api.yaml
+
+# With a real Groq API key (free at console.groq.com)
+set GROQ_API_KEY=your_key_here
+set USE_MOCK=false
+python main.py --spec specs/sample-api.yaml
+```
+
+## Environment variables
+
+Copy `.env.example` and fill in:
+
+| Variable | Required | Description |
+|---|---|---|
+| `JWT_SECRET` | Yes | Min 32 chars, signs auth tokens |
+| `CLIENT_SECRET` | Yes | Min 32 chars, used to get tokens |
+| `MONGO_URI` | Yes | MongoDB connection string |
+| `GROQ_API_KEY` | No | Groq API key (free tier works) |
+| `USE_MOCK` | No | `true` to skip Groq and use mock |
+| `GROQ_URL` | No | Default Groq chat completions endpoint |
+| `BASE_URL` | No | API under test, default: sample-api |
+| `UI_BASE_URL` | No | UI under test, default: demoblaze.com |
+| `HEADLESS` | No | Run browser headless, default: true |
+
+## API endpoints
+
+All endpoints require `Authorization: Bearer <token>` except `/health`, `/ready`, `/metrics`, and `/api/auth/token`.
+
+| Method | Path | Description |
+|---|---|---|
+| POST | /api/auth/token | Get JWT token |
+| GET | /health | Health check |
+| GET | /ready | Readiness check |
+| GET | /metrics | Prometheus metrics |
+| GET | /api/results | Test results |
+| GET | /api/metrics | Aggregated metrics |
+| GET | /api/coverage | Endpoint coverage |
+| GET | /api/flakiness | Flaky tests |
+| GET | /api/defects | Defect logs |
+| GET | /api/gap-report | Coverage gaps |
+
+Get a token:
+
+```bash
+curl -X POST https://intelliqa-dashboard-api-production.up.railway.app/api/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"client_secret":"your-CLIENT_SECRET"}'
+```
 
 ## Monitoring
 
-Grafana: http://localhost:3003
-
-Prometheus: http://localhost:9090
-
-Key metrics to watch:
-
-- `qa_api_requests_total` for request volume and status codes.
-- `qa_api_duration_seconds` for p50, p95, and p99 latency.
-- `qa_test_results_total` for total stored results.
-- `qa_grok_calls_total` for Grok usage.
-- `process_resident_memory_bytes` and `process_cpu_seconds_total` for Node.js resource usage.
-
-To inspect metrics directly:
+Start the monitoring stack:
 
 ```bash
-curl http://localhost:3001/metrics
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 ```
 
-See [monitoring/PRODUCTION_MONITORING.md](monitoring/PRODUCTION_MONITORING.md) for production scraping guidance.
+| Service | URL | Credentials |
+|---|---|---|
+| Grafana | http://localhost:3003 | admin / GRAFANA_ADMIN_PASSWORD |
+| Prometheus | http://localhost:9090 | none |
 
 ## Deployment
 
-GitHub Actions runs a security scan, a staging-scoped build-and-test job, and a production-scoped deploy job from [`.github/workflows/qa-pipeline.yml`](.github/workflows/qa-pipeline.yml). Secrets are scoped through GitHub Environments so CI jobs only see what they need. The deploy job only runs from `main` and only after the build-and-test job succeeds.
+This project deploys to Railway using `railway.json`. See [DEPLOYMENT.md](DEPLOYMENT.md) for the step-by-step guide.
 
-See [`.github/ENVIRONMENT_SETUP.md`](.github/ENVIRONMENT_SETUP.md) for GitHub Environment setup.
+Required Railway environment variables:
+- `JWT_SECRET`, `CLIENT_SECRET`, `MONGO_URI`, `NODE_ENV`, `PORT`
 
-See [docs/deployment-checklist.md](docs/deployment-checklist.md) for the production checklist.
+See [.github/ENVIRONMENT_SETUP.md](.github/ENVIRONMENT_SETUP.md) for GitHub Actions secrets setup.
 
 ## Security
 
-- JWT auth: `/api/auth/token` mints short-lived Bearer tokens after a valid `CLIENT_SECRET` is provided.
-- Rate limiting: the API limits general traffic to `100` requests per `15` minutes and auth requests to `10` per minute.
-- PII redaction: prompt serialization removes common sensitive fields and masks denied fields before Grok calls.
-- Secrets rotation: rotate local and GitHub Environment secrets using [docs/secrets-management.md](docs/secrets-management.md).
+- JWT Bearer token authentication on all API routes
+- Rate limiting: 500 req/15min globally, 30 req/min on auth
+- PII redaction before any data reaches the Groq API
+- Secrets fail-fast: server exits on startup if JWT_SECRET or CLIENT_SECRET are missing
+- See [docs/security-hardening-guide.md](docs/security-hardening-guide.md)
 
-## Project Structure
+## Project structure
 
 ```text
-qa-intelligence-platform-master/
-├── ai-generator/                 # Python generator, prompt builder, PII redaction, Grok client, tests
-├── dashboard-api/                # Express API, JWT auth, validation, metrics, MongoDB access
-├── dashboard-ui/                 # React dashboard, API client, and Vite config
-├── db-init/                      # Mongo init scripts and index verification
-├── docs/                         # API, deployment, operations, security, and troubleshooting docs
-├── monitoring/                   # Prometheus config, Grafana provisioning, dashboards, and guidance
-├── scripts/                      # Backup, restore, secret generation, and secret rotation scripts
-├── test-engine/                  # Java API/UI test suite and Maven project
-├── docker-compose.yml            # Core local stack
-├── docker-compose.override.yml   # Local Prometheus and Grafana overlay
-├── .github/workflows/qa-pipeline.yml # CI pipeline
-├── .github/ENVIRONMENT_SETUP.md   # GitHub Environment setup guide
-├── .env.example                  # Environment variable template
-└── README.md                      # Project overview and operations guide
+IntelliQA/
+├── ai-generator/          # Python: reads spec, calls Groq, writes Java tests
+├── dashboard-api/         # Node.js: REST API, JWT auth, MongoDB queries
+├── dashboard-ui/          # React: live metrics dashboard
+├── test-engine/           # Java: runs API + UI tests, writes results to Mongo
+├── sample-api/            # Node.js: demo API that IntelliQA tests against
+├── db-init/               # MongoDB init scripts and index verification
+├── monitoring/            # Prometheus + Grafana config and dashboards
+├── scripts/               # Backup, restore, seed, and secret rotation scripts
+├── docs/                  # Architecture, API reference, runbook, security guide
+├── .github/               # CI/CD workflow and environment setup guide
+├── docker-compose.yml     # Main stack: MongoDB, API, Selenium, sample-api
+└── docker-compose.override.yml  # Monitoring overlay: Prometheus + Grafana
 ```

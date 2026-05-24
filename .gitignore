@@ -18,6 +18,7 @@ test-engine/target/
 dist/
 dashboard-ui/dist/
 output/
+ai-generator/output/
 generated-tests/
 test-output/
 backups/
